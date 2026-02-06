@@ -9,48 +9,60 @@ SCREEN_HEIGHT = 600
 FPS = 60
 
 # Colors
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 50, 50)
-GREY = (150, 150, 150)
-YELLOW = (255, 255, 0)
-GREEN = (0, 255, 0)
+BLACK = (0, 0, 15) # Deep space blue
+WHITE = (220, 220, 220)
+RED = (255, 60, 60)
+GREY = (100, 100, 100)
+YELLOW = (255, 200, 0)
+GREEN = (50, 255, 50)
+CYAN = (0, 255, 255)
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        # Create a simple triangle surface
-        self.image = pygame.Surface((40, 40), pygame.SRCALPHA)
-        # Draw triangle: (Point 1, Point 2, Point 3)
-        pygame.draw.polygon(self.image, WHITE, [(20, 0), (0, 40), (40, 40)])
+        # Make the ship smaller and more nimble
+        self.image = pygame.Surface((30, 30), pygame.SRCALPHA)
+        # Draw a cool little ship
+        pygame.draw.polygon(self.image, CYAN, [(15, 0), (0, 30), (30, 30)])
         self.rect = self.image.get_rect()
         self.rect.centerx = SCREEN_WIDTH // 2
-        self.rect.bottom = SCREEN_HEIGHT - 10
-        self.speed = 8
+        self.rect.bottom = SCREEN_HEIGHT - 50
+        self.speed = 7
+        self.ammo = 3  # LIMITED AMMO
 
     def update(self):
         keys = pygame.key.get_pressed()
+        
+        # X-Axis Movement
         if keys[pygame.K_LEFT] and self.rect.left > 0:
             self.rect.x -= self.speed
         if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:
             self.rect.x += self.speed
+            
+        # Y-Axis Movement (New!)
+        if keys[pygame.K_UP] and self.rect.top > 0:
+            self.rect.y -= self.speed
+        if keys[pygame.K_DOWN] and self.rect.bottom < SCREEN_HEIGHT:
+            self.rect.y += self.speed
 
     def shoot(self):
-        return Bullet(self.rect.centerx, self.rect.top)
+        if self.ammo > 0:
+            self.ammo -= 1
+            return Bullet(self.rect.centerx, self.rect.top)
+        return None
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((6, 15))
+        self.image = pygame.Surface((4, 10))
         self.image.fill(YELLOW)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.bottom = y
-        self.speed = 10
+        self.speed = 12
 
     def update(self):
         self.rect.y -= self.speed
-        # Kill bullet if it goes off screen
         if self.rect.bottom < 0:
             self.kill()
 
@@ -59,72 +71,91 @@ class Asteroid(pygame.sprite.Sprite):
         super().__init__()
         self.data = data_dict
         
-        # --- 1. Calculate Radius from Diameter ---
-        # Map 10m-300m real size to 10px-60px game size
+        # --- 1. Size ---
         diameter_m = self.data.get('diameter', 50)
-        # Clamp value so it doesn't break the game
-        size_factor = max(10, min(diameter_m, 300)) 
-        self.radius = int((size_factor / 300) * 50) + 10 
-
-        # --- 2. Calculate Speed from Velocity ---
-        # Map 20,000kph-100,000kph to 2-10 game speed
+        size_factor = max(15, min(diameter_m, 400)) 
+        self.radius = int((size_factor / 400) * 60) + 10 
+        
+        # --- 2. Speed (FASTER now) ---
         velocity_kph = self.data.get('velocity', 30000)
-        self.fall_speed = max(2, min(int(velocity_kph / 8000), 12))
+        # Updated Scale: Faster divisor and higher cap
+        # Fast rocks will now drop at up to 12px per frame
+        self.fall_speed = max(3, min(velocity_kph / 6000, 12))
 
-        # --- 3. Determine Color ---
+        # --- 3. Color ---
         self.color = RED if self.data.get('is_hazardous') else GREY
 
-        # Create the image
         self.image = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(self.image, self.color, (self.radius, self.radius), self.radius)
-        
         self.rect = self.image.get_rect()
         
-        # Initialize position
-        self.respawn()
-
-    def respawn(self):
-        """Reset to the top at a random X position."""
+        # --- 4. Spawn Logic ---
         self.rect.x = random.randint(0, SCREEN_WIDTH - self.rect.width)
-        # Start slightly off-screen so they slide in
-        self.rect.y = random.randint(-150, -40)
+        # Spawn them spread out far above the screen
+        self.rect.y = random.randint(-4000, -100)
 
     def update(self):
         self.rect.y += self.fall_speed
         if self.rect.top > SCREEN_HEIGHT:
-            self.respawn()
+            self.kill()
+
+class Star(pygame.sprite.Sprite):
+    """Simple background star for scrolling effect"""
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((2, 2))
+        self.image.fill(WHITE)
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, SCREEN_WIDTH)
+        self.rect.y = random.randint(0, SCREEN_HEIGHT)
+        self.speed = random.randint(1, 3)
+
+    def update(self):
+        self.rect.y += self.speed
+        if self.rect.top > SCREEN_HEIGHT:
+            self.rect.y = 0
+            self.rect.x = random.randint(0, SCREEN_WIDTH)
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("NASA Asteroid Defender")
+    pygame.display.set_caption("NASA Asteroid Dodger: Daily Feed")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Arial", 18)
-    game_over_font = pygame.font.SysFont("Arial", 48)
+    
+    # Fonts
+    ui_font = pygame.font.SysFont("Courier New", 20, bold=True)
+    name_font = pygame.font.SysFont("Arial", 12) # Small font for names
+    big_font = pygame.font.SysFont("Courier New", 50, bold=True)
 
     # --- Fetch Data ---
-    # We call your other script here!
-    print("Initializing Game System...")
+    print("Downloading Daily Asteroid Feed...")
     asteroid_list = fetch_asteroid_data()
+    total_asteroids = len(asteroid_list)
     
-    # Sprite Groups
+    # Groups
     all_sprites = pygame.sprite.Group()
     asteroids_group = pygame.sprite.Group()
     bullets_group = pygame.sprite.Group()
+    stars_group = pygame.sprite.Group()
 
+    # Create Stars
+    for _ in range(50):
+        star = Star()
+        all_sprites.add(star)
+        stars_group.add(star)
+
+    # Create Player
     player = Player()
     all_sprites.add(player)
 
-    # Create Asteroid Objects from Data
-    # If API gives 10 objects, we make 10 enemies.
+    # Create Asteroids
     for data in asteroid_list:
         ast = Asteroid(data)
         all_sprites.add(ast)
         asteroids_group.add(ast)
 
-    score = 0
     running = True
-    game_over = False
+    game_state = "PLAYING" # PLAYING, WON, LOST
 
     while running:
         # 1. Event Handling
@@ -132,63 +163,72 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             
-            if not game_over:
+            if game_state == "PLAYING":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         bullet = player.shoot()
-                        all_sprites.add(bullet)
-                        bullets_group.add(bullet)
-            else:
-                # Restart on key press if game over
+                        if bullet:
+                            all_sprites.add(bullet)
+                            bullets_group.add(bullet)
+
+            elif game_state in ["WON", "LOST"]:
                 if event.type == pygame.KEYDOWN:
-                    # Reset game
-                    game_over = False
-                    score = 0
-                    bullets_group.empty()
-                    # Reset all asteroids to top
-                    for ast in asteroids_group:
-                        ast.respawn()
+                    running = False
 
         # 2. Update
-        if not game_over:
+        if game_state == "PLAYING":
             all_sprites.update()
 
             # Collision: Bullet hits Asteroid
-            hits = pygame.sprite.groupcollide(asteroids_group, bullets_group, False, True)
-            for hit_asteroid in hits:
-                score += 100
-                print(f"Destroyed: {hit_asteroid.data['name']}!")
-                hit_asteroid.respawn()
+            hits = pygame.sprite.groupcollide(asteroids_group, bullets_group, True, True)
+            
+            # Collision: Player hits Asteroid
+            if pygame.sprite.spritecollide(player, asteroids_group, False):
+                game_state = "LOST"
 
-            # Collision: Asteroid hits Player
-            hits = pygame.sprite.spritecollide(player, asteroids_group, False)
-            if hits:
-                game_over = True
-                print("GAME OVER - Impact Detected!")
+            # Check Win Condition
+            if len(asteroids_group) == 0:
+                game_state = "WON"
 
         # 3. Draw
         screen.fill(BLACK)
         all_sprites.draw(screen)
 
-        # Draw Asteroid Names (Optional Text)
+        # Draw Asteroid Names (New!)
         for ast in asteroids_group:
-            text_surf = font.render(ast.data['name'], True, WHITE)
-            # Center text above the asteroid
-            text_rect = text_surf.get_rect(center=(ast.rect.centerx, ast.rect.top - 10))
-            screen.blit(text_surf, text_rect)
+            # Only draw name if it's on screen
+            if ast.rect.bottom > 0 and ast.rect.top < SCREEN_HEIGHT:
+                name_text = name_font.render(ast.data['name'], True, WHITE)
+                # Center text above the asteroid
+                text_rect = name_text.get_rect(center=(ast.rect.centerx, ast.rect.top - 10))
+                screen.blit(name_text, text_rect)
 
-        # Draw UI
-        score_text = font.render(f"Score: {score}", True, GREEN)
-        screen.blit(score_text, (10, 10))
-
-        if game_over:
-            go_text = game_over_font.render("GAME OVER", True, RED)
-            go_rect = go_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
-            screen.blit(go_text, go_rect)
+        # UI Overlay
+        if game_state == "PLAYING":
+            ammo_text = ui_font.render(f"MISSILES: {player.ammo}", True, YELLOW)
+            screen.blit(ammo_text, (10, SCREEN_HEIGHT - 30))
             
-            sub_text = font.render("Press any key to restart", True, WHITE)
-            sub_rect = sub_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 50))
-            screen.blit(sub_text, sub_rect)
+            remaining = len(asteroids_group)
+            rem_text = ui_font.render(f"THREATS: {remaining}/{total_asteroids}", True, WHITE)
+            screen.blit(rem_text, (10, 10))
+
+        elif game_state == "LOST":
+            text = big_font.render("IMPACT DETECTED", True, RED)
+            rect = text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
+            screen.blit(text, rect)
+            
+            sub = ui_font.render("Press any key to exit.", True, WHITE)
+            sub_rect = sub.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 50))
+            screen.blit(sub, sub_rect)
+
+        elif game_state == "WON":
+            text = big_font.render("ORBIT CLEAR", True, GREEN)
+            rect = text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
+            screen.blit(text, rect)
+            
+            sub = ui_font.render("Daily Feed Survived.", True, WHITE)
+            sub_rect = sub.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 50))
+            screen.blit(sub, sub_rect)
 
         pygame.display.flip()
         clock.tick(FPS)

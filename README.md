@@ -3,7 +3,7 @@
 Model: Gemini Pro
 Important Prompts: 
 (Many prompts prior about brainstorming and logistics)
-"I need a Python script using requests to fetch data from the NASA NeoWs (Near Earth Object) API.
+1. "I need a Python script using requests to fetch data from the NASA NeoWs (Near Earth Object) API.
 
 Load API key from .env.
 
@@ -23,7 +23,7 @@ is_hazardous (boolean)
 
 Handle errors (e.g., if the API fails, return a hardcoded 'dummy' list so I can test the game offline)." (Given by and fed to Gemini)
 
-"I have a file named asteroid_data.py with a function fetch_asteroid_data() that returns a list of asteroid dictionaries.
+2. "I have a file named asteroid_data.py with a function fetch_asteroid_data() that returns a list of asteroid dictionaries.
 
 Now, write a main.py script using pygame to create the game.
 
@@ -61,3 +61,6 @@ UI: Display the Score in the top left.
 
 Please write the complete, run-able code." (Given and fed to Gemini)
 
+(Accidentally pushed my api key, so I deleted and remade the entire repo)
+
+3. ok can you redo the game concept tho, keep all the asteroids speeds relative, but far slower. make the goal to reach the end of a topdown scrolling game, far less ammo, but keep ammo there that can break 1 asteroid. this game should be more about dodging asteroids than breaking them.
