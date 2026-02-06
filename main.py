@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import math
+import datetime
 from asteroid_data import fetch_asteroid_data, fetch_apod_image
 
 # --- Constants ---
@@ -39,12 +40,27 @@ def create_jagged_rock(radius, color):
     return surf
 
 def format_number(n):
-    if n >= 1_000_000:
-        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000_000: return f"{n/1_000_000:.1f}M"
     return f"{n/1_000:.0f}K"
+
+def log_mission(status, date_str, closest_name, closest_dist):
+    """Writes the mission result to a local text file"""
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = (
+        f"[{timestamp}] MISSION: {date_str} | STATUS: {status} | "
+        f"CLOSEST: {closest_name} ({closest_dist:,.0f} km)\n"
+    )
+    
+    try:
+        with open("FLIGHT_RECORDER.txt", "a") as f:
+            f.write(log_entry)
+        print("Mission logged to FLIGHT_RECORDER.txt")
+    except Exception as e:
+        print(f"Recorder Error: {e}")
 
 # --- Sprite Classes ---
 class Particle(pygame.sprite.Sprite):
+    """Engine exhaust"""
     def __init__(self, x, y):
         super().__init__()
         self.size = random.randint(2, 5)
@@ -60,6 +76,25 @@ class Particle(pygame.sprite.Sprite):
     def update(self):
         self.rect.y += self.speed_y
         self.rect.x += self.speed_x
+        self.life -= 1
+        if self.life <= 0: self.kill()
+
+class ExplosionShard(pygame.sprite.Sprite):
+    """Explosion debris"""
+    def __init__(self, x, y, color):
+        super().__init__()
+        self.size = random.randint(3, 8)
+        self.image = pygame.Surface((self.size, self.size))
+        self.image.fill(color)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.life = 30 
+        self.vel_x = random.uniform(-6, 6)
+        self.vel_y = random.uniform(-6, 6)
+
+    def update(self):
+        self.rect.x += self.vel_x
+        self.rect.y += self.vel_y
         self.life -= 1
         if self.life <= 0: self.kill()
 
@@ -115,8 +150,10 @@ class Asteroid(pygame.sprite.Sprite):
         self.fall_speed = max(5, min(velocity_kph / 5000, 15))
         self.drift_speed = random.choice([-2, -1, 0, 1, 2])
 
-        base_color = NEON_RED if self.data.get('is_hazardous') else ROCK_GREY
-        self.image = create_jagged_rock(self.radius, base_color)
+        # --- FIX: Save the color as an attribute so ExplosionShard can use it ---
+        self.color = NEON_RED if self.data.get('is_hazardous') else ROCK_GREY
+        
+        self.image = create_jagged_rock(self.radius, self.color)
         self.rect = self.image.get_rect()
         self.rect.x = random.randint(0, SCREEN_WIDTH - self.rect.width)
         self.rect.y = random.randint(-2500, -100)
@@ -147,13 +184,14 @@ class Star(pygame.sprite.Sprite):
 
 # --- MAIN ---
 def main():
-    # 1. CLI INPUT
     print("\n--- NASA ASTEROID DEFENDER SYSTEM ---")
     user_date = input("Enter mission date (YYYY-MM-DD) or press ENTER for Today: ")
     if user_date.strip() == "":
         user_date = None 
+        display_date = "TODAY"
+    else:
+        display_date = user_date
     
-    # 2. DATA FETCH
     print("Initializing Radar...")
     asteroid_list = fetch_asteroid_data(user_date)
     total_asteroids = len(asteroid_list)
@@ -166,17 +204,16 @@ def main():
         closest_name = "None"
         closest_dist = 0
     
-    # 3. GAME INIT
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption(f"Mission Date: {user_date if user_date else 'TODAY'}")
+    pygame.display.set_caption(f"Mission Date: {display_date}")
     clock = pygame.time.Clock()
     
     ui_font = pygame.font.SysFont("Courier New", 20, bold=True)
     name_font = pygame.font.SysFont("Arial", 12, bold=True)
     big_font = pygame.font.SysFont("Courier New", 40, bold=True) 
 
-    # Fetch Background
+    # Background
     bg_file = fetch_apod_image()
     background_surf = None
     if bg_file:
@@ -220,6 +257,7 @@ def main():
 
     running = True
     game_state = "PLAYING"
+    logged_once = False 
 
     while running:
         for event in pygame.event.get():
@@ -239,6 +277,7 @@ def main():
                     if event.key == pygame.K_r:
                         reset_level()
                         game_state = "PLAYING"
+                        logged_once = False
                     elif event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
                         running = False
 
@@ -248,11 +287,27 @@ def main():
             particles_group.add(p)
             all_sprites.update()
             
+            # 1. Bullet vs Asteroid
             hits = pygame.sprite.groupcollide(asteroids_group, bullets_group, True, True)
+            for hit_ast in hits:
+                # Spawn Shatter Debris
+                for _ in range(25): 
+                    shard = ExplosionShard(hit_ast.rect.centerx, hit_ast.rect.centery, hit_ast.color)
+                    all_sprites.add(shard)
+                    particles_group.add(shard)
+
+            # 2. Player vs Asteroid
             if pygame.sprite.spritecollide(player, asteroids_group, False, pygame.sprite.collide_circle):
                 game_state = "LOST"
+
+            # 3. Win Condition
             if len(asteroids_group) == 0:
                 game_state = "WON"
+
+        # --- LOGGING ---
+        if game_state in ["WON", "LOST"] and not logged_once:
+            log_mission(game_state, display_date, closest_name, closest_dist)
+            logged_once = True
 
         # --- Draw Phase ---
         if background_surf: screen.blit(background_surf, (0, 0))
@@ -266,21 +321,17 @@ def main():
                 screen.blit(name_text, text_rect)
 
         if game_state == "PLAYING":
-            # --- UI SECTION ---
             color = NEON_CYAN if player.ammo > 0 else NEON_RED
             ammo_text = ui_font.render(f"MISSILES: {player.ammo}", True, color)
             screen.blit(ammo_text, (10, SCREEN_HEIGHT - 30))
             
-            # Added: Help Text
             help_text = name_font.render("[SPACE] TO SHOOT", True, (150, 150, 150))
-            # Position it right next to the ammo counter
             screen.blit(help_text, (160, SCREEN_HEIGHT - 28))
 
             remaining = len(asteroids_group)
             rem_text = ui_font.render(f"THREATS: {remaining}/{total_asteroids}", True, WHITE)
             screen.blit(rem_text, (10, 10))
 
-        # --- End Screens ---
         elif game_state == "LOST":
             text = big_font.render("CRITICAL FAILURE", True, NEON_RED)
             rect = text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 40))
@@ -289,6 +340,10 @@ def main():
             report = ui_font.render(f"Closest: {closest_name} ({format_number(closest_dist)} km)", True, WHITE)
             rep_rect = report.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 20))
             screen.blit(report, rep_rect)
+            
+            log_text = name_font.render("Report saved to FLIGHT_RECORDER.txt", True, (100, 100, 100))
+            log_rect = log_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 20))
+            screen.blit(log_text, log_rect)
 
             sub = ui_font.render("[R] Restart   [Q] Quit", True, WHITE)
             sub_rect = sub.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 60))
@@ -306,6 +361,10 @@ def main():
             dist_text = ui_font.render(f"Distance: {closest_dist:,.0f} km", True, WHITE)
             dist_rect = dist_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 40))
             screen.blit(dist_text, dist_rect)
+            
+            log_text = name_font.render("Report saved to FLIGHT_RECORDER.txt", True, (100, 100, 100))
+            log_rect = log_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 20))
+            screen.blit(log_text, log_rect)
             
             sub = ui_font.render("[R] Restart   [Q] Quit", True, WHITE)
             sub_rect = sub.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 80))

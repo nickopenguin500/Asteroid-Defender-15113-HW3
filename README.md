@@ -75,3 +75,11 @@ Please write the complete, run-able code." (Given and fed to Gemini)
 
 8. now can we implement option 2 and 3
 (option 2 was adding an input for the user to select a specific day, option 3 was showing info at the end)
+
+9. can you add a way to restart easier (like pressing r)
+
+10. can you add text next to the missiles text that tells the player to use spacebar to shoot
+
+11. is there anything else i can add
+
+12. 
