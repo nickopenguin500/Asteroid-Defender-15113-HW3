@@ -1,0 +1,9 @@
+# Secrets - NEVER commit these
+.env
+
+# Python compilation files (useless junk)
+__pycache__/
+*.pyc
+
+# Mac system files (useless junk)
+.DS_Store
