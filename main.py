@@ -39,7 +39,6 @@ def create_jagged_rock(radius, color):
     return surf
 
 def format_number(n):
-    """Turns 1234567 into 1.2M"""
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f}M"
     return f"{n/1_000:.0f}K"
@@ -148,21 +147,24 @@ class Star(pygame.sprite.Sprite):
 
 # --- MAIN ---
 def main():
-    # 1. CLI INPUT (Time Travel)
+    # 1. CLI INPUT
     print("\n--- NASA ASTEROID DEFENDER SYSTEM ---")
     user_date = input("Enter mission date (YYYY-MM-DD) or press ENTER for Today: ")
     if user_date.strip() == "":
-        user_date = None # Defaults to today in logic
+        user_date = None 
     
     # 2. DATA FETCH
     print("Initializing Radar...")
     asteroid_list = fetch_asteroid_data(user_date)
     total_asteroids = len(asteroid_list)
     
-    # Find the Closest Approach (Real Analysis)
-    closest_rock = min(asteroid_list, key=lambda x: x['miss_distance'])
-    closest_name = closest_rock['name']
-    closest_dist = closest_rock['miss_distance']
+    if total_asteroids > 0:
+        closest_rock = min(asteroid_list, key=lambda x: x['miss_distance'])
+        closest_name = closest_rock['name']
+        closest_dist = closest_rock['miss_distance']
+    else:
+        closest_name = "None"
+        closest_dist = 0
     
     # 3. GAME INIT
     pygame.init()
@@ -172,7 +174,7 @@ def main():
     
     ui_font = pygame.font.SysFont("Courier New", 20, bold=True)
     name_font = pygame.font.SysFont("Arial", 12, bold=True)
-    big_font = pygame.font.SysFont("Courier New", 40, bold=True) # Slightly smaller for long text
+    big_font = pygame.font.SysFont("Courier New", 40, bold=True) 
 
     # Fetch Background
     bg_file = fetch_apod_image()
@@ -193,17 +195,28 @@ def main():
     bullets_group = pygame.sprite.Group()
     particles_group = pygame.sprite.Group()
     
-    for _ in range(30): all_sprites.add(Star(1))
-    for _ in range(20): all_sprites.add(Star(2))
-    for _ in range(10): all_sprites.add(Star(3))
+    player = None
 
-    player = Player()
-    all_sprites.add(player)
+    def reset_level():
+        nonlocal player
+        all_sprites.empty()
+        asteroids_group.empty()
+        bullets_group.empty()
+        particles_group.empty()
 
-    for data in asteroid_list:
-        ast = Asteroid(data)
-        all_sprites.add(ast)
-        asteroids_group.add(ast)
+        for _ in range(30): all_sprites.add(Star(1))
+        for _ in range(20): all_sprites.add(Star(2))
+        for _ in range(10): all_sprites.add(Star(3))
+
+        player = Player()
+        all_sprites.add(player)
+
+        for data in asteroid_list:
+            ast = Asteroid(data)
+            all_sprites.add(ast)
+            asteroids_group.add(ast)
+
+    reset_level()
 
     running = True
     game_state = "PLAYING"
@@ -223,7 +236,11 @@ def main():
 
             elif game_state in ["WON", "LOST"]:
                 if event.type == pygame.KEYDOWN:
-                    running = False
+                    if event.key == pygame.K_r:
+                        reset_level()
+                        game_state = "PLAYING"
+                    elif event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+                        running = False
 
         if game_state == "PLAYING":
             p = Particle(player.rect.centerx, player.rect.bottom)
@@ -249,26 +266,31 @@ def main():
                 screen.blit(name_text, text_rect)
 
         if game_state == "PLAYING":
+            # --- UI SECTION ---
             color = NEON_CYAN if player.ammo > 0 else NEON_RED
             ammo_text = ui_font.render(f"MISSILES: {player.ammo}", True, color)
             screen.blit(ammo_text, (10, SCREEN_HEIGHT - 30))
             
+            # Added: Help Text
+            help_text = name_font.render("[SPACE] TO SHOOT", True, (150, 150, 150))
+            # Position it right next to the ammo counter
+            screen.blit(help_text, (160, SCREEN_HEIGHT - 28))
+
             remaining = len(asteroids_group)
             rem_text = ui_font.render(f"THREATS: {remaining}/{total_asteroids}", True, WHITE)
             screen.blit(rem_text, (10, 10))
 
-        # --- NEW: Enhanced End Screens ---
+        # --- End Screens ---
         elif game_state == "LOST":
             text = big_font.render("CRITICAL FAILURE", True, NEON_RED)
             rect = text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 40))
             screen.blit(text, rect)
             
-            # Show the closest shave data even if lost
             report = ui_font.render(f"Closest: {closest_name} ({format_number(closest_dist)} km)", True, WHITE)
             rep_rect = report.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 20))
             screen.blit(report, rep_rect)
 
-            sub = ui_font.render("Press any key to exit.", True, WHITE)
+            sub = ui_font.render("[R] Restart   [Q] Quit", True, WHITE)
             sub_rect = sub.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 60))
             screen.blit(sub, sub_rect)
 
@@ -277,7 +299,6 @@ def main():
             rect = text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 40))
             screen.blit(text, rect)
             
-            # Show the closest shave data
             report = ui_font.render(f"Closest Shave: {closest_name}", True, NEON_RED)
             rep_rect = report.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 10))
             screen.blit(report, rep_rect)
@@ -285,6 +306,10 @@ def main():
             dist_text = ui_font.render(f"Distance: {closest_dist:,.0f} km", True, WHITE)
             dist_rect = dist_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 40))
             screen.blit(dist_text, dist_rect)
+            
+            sub = ui_font.render("[R] Restart   [Q] Quit", True, WHITE)
+            sub_rect = sub.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 80))
+            screen.blit(sub, sub_rect)
 
         pygame.display.flip()
         clock.tick(FPS)
