@@ -191,6 +191,8 @@ def main():
         display_date = "TODAY"
     else:
         display_date = user_date
+    # Fetch Background (Pass the user_date!)
+    bg_file = fetch_apod_image(user_date)
     
     print("Initializing Radar...")
     asteroid_list = fetch_asteroid_data(user_date)
@@ -214,7 +216,6 @@ def main():
     big_font = pygame.font.SysFont("Courier New", 40, bold=True) 
 
     # Background
-    bg_file = fetch_apod_image()
     background_surf = None
     if bg_file:
         try:

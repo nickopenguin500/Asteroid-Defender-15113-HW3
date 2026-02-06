@@ -69,13 +69,32 @@ def fetch_asteroid_data(target_date=None):
         print(f"API Connection Failed: {e}")
         return get_dummy_data()
 
-def fetch_apod_image():
-    """Fetches APOD Background"""
+def fetch_apod_image(target_date=None):
+    """
+    Fetches APOD. 
+    - If target_date is in the past, fetches that specific image.
+    - If target_date is in the future (or None), fetches TODAY's image.
+    """
     api_key = os.getenv("NASA_API_KEY")
     if not api_key: return None
 
+    # Logic: Don't ask for future photos (NASA returns error)
+    today_str = date.today().strftime("%Y-%m-%d")
+    
+    request_date = None
+    if target_date:
+        if target_date > today_str:
+            print(f"Date {target_date} is in the future. Defaulting to Today's APOD.")
+            request_date = None # API implies 'today' if date param is missing
+        else:
+            request_date = target_date
+
     url = "https://api.nasa.gov/planetary/apod"
     params = {"api_key": api_key}
+    if request_date:
+        params["date"] = request_date
+    
+    print(f"Fetching Background Image ({request_date if request_date else 'TODAY'})...")
     
     try:
         response = requests.get(url, params=params, timeout=10)
@@ -89,8 +108,9 @@ def fetch_apod_image():
                 with open("background.jpg", 'wb') as f:
                     shutil.copyfileobj(img_response.raw, f)
                 return "background.jpg"
-    except:
-        pass
+    except Exception as e:
+        print(f"Could not fetch APOD background: {e}")
+    
     return None
 
 def get_dummy_data():
