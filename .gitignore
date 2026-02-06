@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .DS_Store
 FLIGHT_RECORDER.txt
+background.jpg
