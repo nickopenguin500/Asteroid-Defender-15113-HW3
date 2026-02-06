@@ -61,6 +61,17 @@ UI: Display the Score in the top left.
 
 Please write the complete, run-able code." (Given and fed to Gemini)
 
-(Accidentally pushed my api key, so I deleted and remade the entire repo)
+# (Accidentally pushed my api key, so I deleted and remade the entire repo)
 
 3. ok can you redo the game concept tho, keep all the asteroids speeds relative, but far slower. make the goal to reach the end of a topdown scrolling game, far less ammo, but keep ammo there that can break 1 asteroid. this game should be more about dodging asteroids than breaking them.
+
+4. make it so the player can move anywhere on the screen, asteroids are faster and have their names on them again
+
+5. harder, its still too easy, especially with the bullets
+
+6. its still kinda easy but ok for now, now can you improve the graphics
+
+7. is there any more you could do with specifically the api aspect of the project/game?
+
+8. now can we implement option 2 and 3
+(option 2 was adding an input for the user to select a specific day, option 3 was showing info at the end)
